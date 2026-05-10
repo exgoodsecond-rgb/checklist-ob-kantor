@@ -68,30 +68,61 @@ if (cleaningForm) {
     const reader = new FileReader();
     reader.readAsDataURL(photoFile);
 
-    reader.onload = function () {
-      const base64Data = reader.result.split(",")[1];
+  reader.onload = function (event) {
+      const img = new Image();
+      img.src = event.target.result;
 
-      const formData = new URLSearchParams();
-      formData.append("obName", name);
-      formData.append("tasks", checkedTasks);
-      formData.append("fileData", base64Data);
-      formData.append("fileName", photoFile.name);
-      formData.append("mimeType", photoFile.type);
+      img.onload = function () {
+        // --- PROSES RESIZE ---
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800; // Ukuran lebar maksimal (sudah cukup jelas untuk bukti)
+        let width = img.width;
+        let height = img.height;
 
-      fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        body: formData,
-      }).then(() => {
-        alert("Laporan berhasil dikirim!");
-        cleaningForm.reset();
-        document.getElementById("preview").innerHTML = "";
-        submitBtn.innerText = "Kirim Laporan";
-        submitBtn.disabled = false;
-      });
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_WIDTH) {
+            width *= MAX_WIDTH / height;
+            height = MAX_WIDTH;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Ubah ke Base64 dengan kualitas 0.7 (70% kualitas asli, hemat memori)
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+
+        // --- KIRIM DATA ---
+        const formData = new URLSearchParams();
+        formData.append("obName", name);
+        formData.append("tasks", checkedTasks);
+        formData.append("fileData", compressedBase64); // Data yang sudah kecil
+        formData.append("fileName", "photo.jpg");
+        formData.append("mimeType", "image/jpeg");
+
+        fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: formData,
+        }).then(() => {
+          alert("Laporan berhasil dikirim!");
+          cleaningForm.reset();
+          document.getElementById("preview").innerHTML = "";
+          submitBtn.innerText = "Kirim Laporan";
+          submitBtn.disabled = false;
+        }).catch(err => {
+          alert("Gagal kirim: " + err);
+          submitBtn.disabled = false;
+        });
+      };
     };
-  });
-}
 
 // ==============================
 // 🖼️ PREVIEW GAMBAR (HOME SAJA)
